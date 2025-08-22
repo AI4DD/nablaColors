@@ -204,7 +204,8 @@ class UnimolPlusLoss(UnicoreLoss):
             id = np.concatenate([log["id"] for log in logging_outputs])
             pred = np.concatenate([log["pred"] for log in logging_outputs])
             label = np.concatenate([log["label"] for log in logging_outputs])
-            if self.args.multitarget:
+            is_multitarget = pred.ndim > 1
+            if is_multitarget:
                 def sigmoid(x):
                     return 1 / (1 + np.exp(-x))
 
@@ -231,7 +232,7 @@ class UnimolPlusLoss(UnicoreLoss):
             df_grouped = df.groupby(["id"])
             df_mean = df_grouped.agg("mean")
             df_median = df_grouped.agg("median")
-            if self.args.multitarget:
+            if is_multitarget:
                 def get_mae_losses(df):
                     abs_non_nan_mask = ~df["label_abs"].isna()
                     ems_non_nan_mask = ~df["label_ems"].isna()

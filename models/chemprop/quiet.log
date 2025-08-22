@@ -1,0 +1,4 @@
+Fold 0
+Model 0 best validation rmse = 33.728455 on epoch 273
+Model 0 test rmse = 36.193312
+Model 0 test mae = 23.484015

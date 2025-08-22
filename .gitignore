@@ -8,3 +8,5 @@ unimol_plus/wandb/
 unimol_plus/unimol_plus/models/__pycache__/
 unimol_plus/unimol_plus/**/__pycache__/
 *.pyc
+unimol_plus/build/
+unimol_plus/wandb/

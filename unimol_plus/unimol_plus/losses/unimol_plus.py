@@ -226,6 +226,7 @@ class UnimolPlusLoss(UnicoreLoss):
                 }
             else:
                 res_dict = {
+                    "id": id,
                     "pred": pred,
                     "label": label,
                 }

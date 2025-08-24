@@ -216,6 +216,7 @@ class UnimolPlusLoss(UnicoreLoss):
                 label_ems = label[:, 1]
                 label_plqy = label[:, 2]
                 res_dict = {
+                    "id": id,
                     "pred_abs": pred_abs,
                     "pred_ems": pred_ems,
                     "pred_plqy": pred_plqy,

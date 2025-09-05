@@ -5,28 +5,28 @@ MASTER_IP=127.0.0.1
 n_gpu=2
 
 exp_name=singletarget
-run_name=bs_2_unfreeze_backbone
+run_name=bs_64_unfreeze_backbone_5e-4lr
 
 OMPI_COMM_WORLD_SIZE=1
 OMPI_COMM_WORLD_RANK=0
-data_path="../xtb_to_dft_implicit/split_1"
+data_path="../conformations/xtb_to_dft_implicit/"
 save_dir="../results/checkpoints_unimol/exp_${exp_name}/run_${run_name}"
 user_dir="./unimol_plus"
 train_set="train"
-valid_sets="valid"
+valid_sets="valid,test"
 chemprop_pretrain="../models/chemprop/fold_0/model_1/model.pt"
 
 # Defaults (can be overridden by CLI)
-pretrained_model="../results/checkpoints_unimol/exp_multitarget/run_bs_2_head_pretrain-ema0.999/checkpoint_best_expmultitarget_runbs_2_head_pretrain.pt"
+pretrained_model="../results/checkpoints_unimol/exp_singletarget/run_bs_2_head_pretrain-ema0.999/checkpoint_best_expsingletarget_runbs_64_head_pretrain.pt"
 
-batch_size=1
-batch_size_valid=1
-lr=8e-5
+batch_size=4
+batch_size_valid=4
+lr=5e-4
 end_lr=1e-9
 
-warmup_steps=30000
-total_steps=300000
-update_freq=2
+warmup_steps=10000
+total_steps=80000
+update_freq=16
 seed=1
 clip_norm=5
 weight_decay=0.0

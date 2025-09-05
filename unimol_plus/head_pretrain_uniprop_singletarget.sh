@@ -9,7 +9,7 @@ run_name=bs_2_head_pretrain
 
 OMPI_COMM_WORLD_SIZE=1
 OMPI_COMM_WORLD_RANK=0
-data_path="../xtb_to_dft_implicit/split_1"
+data_path="../conformations/xtb_to_dft_implicit/"
 save_dir="../results/checkpoints_unimol/exp_${exp_name}/run_${run_name}"
 user_dir="./unimol_plus"
 train_set="train"
@@ -19,14 +19,14 @@ chemprop_pretrain="../models/chemprop/fold_0/model_1/model.pt"
 # Defaults (can be overridden by CLI)
 pretrained_model="../unimol_plus_pcq_small.pt"
 
-batch_size=2
-batch_size_valid=2
-lr=8e-5
+batch_size=16
+batch_size_valid=16
+lr=5e-4
 end_lr=1e-9
 
-warmup_steps=30000
-total_steps=300000
-update_freq=1
+warmup_steps=10000
+total_steps=100000
+update_freq=4
 seed=1
 clip_norm=5
 weight_decay=0.0

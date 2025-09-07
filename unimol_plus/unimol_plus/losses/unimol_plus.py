@@ -91,7 +91,7 @@ class UnimolPlusLoss(UnicoreLoss):
 
                 # Calculate L1 loss for each target separately
                 per_data_loss = torch.nn.L1Loss(reduction="none")(
-                    graph_output.float(), targets_mod
+                    graph_output.float(), targets
                 ) * (1 - NaN_target_mask.float())  # mask out NaN targets
 
                 # Apply different weights to each target column

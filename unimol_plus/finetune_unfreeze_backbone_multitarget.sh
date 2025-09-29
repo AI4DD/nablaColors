@@ -2,31 +2,27 @@
 
 MASTER_PORT=10011
 MASTER_IP=127.0.0.1
-n_gpu=2
+n_gpu=1
 
 exp_name=multitarget
-run_name=bs_2_unfreeze_backbone
+
 
 OMPI_COMM_WORLD_SIZE=1
 OMPI_COMM_WORLD_RANK=0
-data_path="../xtb_to_dft_implicit/split_1"
-save_dir="../results/checkpoints_unimol/exp_${exp_name}/run_${run_name}"
-user_dir="./unimol_plus"
+
+user_dir="/home/jovyan/potapov/nablaColors/nablaColors/unimol_plus/"
 train_set="train"
 valid_sets="valid"
-chemprop_pretrain="../models/chemprop/fold_0/model_1/model.pt"
+chemprop_pretrain="/home/jovyan/potapov/nablaColors/nablaColors/models/chemprop/fold_0/model_1/model.pt"
 
-# Defaults (can be overridden by CLI)
-pretrained_model="../results/checkpoints_unimol/exp_multitarget/run_bs_2_head_pretrain-ema0.999/checkpoint_best_expmultitarget_runbs_2_head_pretrain.pt"
-
-batch_size=2
-batch_size_valid=2
-lr=8e-5
+batch_size=4
+batch_size_valid=4
+lr=6e-5
 end_lr=1e-9
 
-warmup_steps=30000
-total_steps=300000
-update_freq=1
+warmup_steps=10000
+total_steps=100000
+update_freq=16
 seed=1
 clip_norm=5
 weight_decay=0.0
@@ -57,17 +53,35 @@ arch="uniprop_small"
 export NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=1
 
-# Parse CLI flags
+# Parse CLI flags (required: --fold-name and --fold-path)
 while [ $# -gt 0 ]; do
     case "$1" in
-        --data-path)
-            data_path="$2"; shift 2 ;;
+        --fold-name|--fold_name)
+            fold_name="$2"; shift 2 ;;
+        --fold-path|--fold_path)
+            fold_path="$2"; shift 2 ;;
         --pretrained-model)
             pretrained_model="$2"; shift 2 ;;
         *)
             echo "Unknown argument: $1"; exit 1 ;;
     esac
 done
+
+# Require mandatory flags
+if [ -z "${fold_name:-}" ] || [ -z "${fold_path:-}" ]; then
+    echo "Usage: $0 --fold-name <N> --fold-path <PATH> [--pretrained-model <FILE>]" >&2
+    exit 1
+fi
+
+# Derive dataset path from fold flags
+data_path="${fold_path}/split_${fold_name}/"
+run_name=bs_64_unfreeze_backbone_fold_${fold_name}_6e-5
+save_dir="/home/jovyan/potapov/nablaColors/results/checkpoints_unimol/exp_${exp_name}/run_${run_name}/"
+
+# Build default pretrained checkpoint path for this fold/task if not provided
+if [ -z "${pretrained_model:-}" ]; then
+    pretrained_model="/home/jovyan/potapov/nablaColors/results/checkpoints_unimol/exp_${exp_name}/run_bs_64_head_pretrain_fold_${fold_name}/-ema${ema_decay}/checkpoint_best_exp${exp_name}_runbs_64_head_pretrain_fold_${fold_name}.pt"
+fi
 
 more_args="--finetune-from-model $pretrained_model
 --checkpoint-suffix _exp${exp_name}_run${run_name} --wandb-project UniMol 
@@ -83,8 +97,8 @@ export NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=1
 
 echo "torchrun --nproc_per_node=$n_gpu --nnodes=$OMPI_COMM_WORLD_SIZE  --node_rank=$OMPI_COMM_WORLD_RANK  --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
-      $(which unicore-train) $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
-      --num-workers 8 --ddp-backend=c10d \
+      /home/user/.local/bin/unicore-train $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
+      --num-workers 4 --ddp-backend=c10d \
       --task pcq --loss unimol_plus --arch $arch --chemprop-weight-path $chemprop_pretrain  \
       --fp16 False --fp16-init-scale 4 --fp16-scale-window 256 --tensorboard-logdir $save_dir/tsb \
       --log-interval $log_interval --log-format simple \
@@ -103,7 +117,7 @@ echo "torchrun --nproc_per_node=$n_gpu --nnodes=$OMPI_COMM_WORLD_SIZE  --node_ra
       --mid-prob $mid_prob --mid-lower $mid_lower --mid-upper $mid_upper --seed $seed $more_args"
 
 torchrun --nproc_per_node=$n_gpu --nnodes=$OMPI_COMM_WORLD_SIZE  --node_rank=$OMPI_COMM_WORLD_RANK  --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
-      $(which unicore-train) $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
+      /home/user/.local/bin/unicore-train $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
       --num-workers 4 --ddp-backend=c10d \
       --task pcq --loss unimol_plus --arch $arch  --chemprop-weight-path $chemprop_pretrain \
       --fp16-init-scale 4 --fp16-scale-window 256 --tensorboard-logdir $save_dir/tsb \

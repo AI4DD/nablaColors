@@ -2,25 +2,25 @@
 
 MASTER_PORT=10014
 MASTER_IP=127.0.0.1
-n_gpu=2
+n_gpu=1
 
 exp_name=singletarget
-run_name=bs_2_head_pretrain
+# fold_name and run_name are set after CLI parsing
+# run_name is derived from fold_name later
 
 OMPI_COMM_WORLD_SIZE=1
 OMPI_COMM_WORLD_RANK=0
-data_path="../conformations/xtb_to_dft_implicit/"
-save_dir="../results/checkpoints_unimol/exp_${exp_name}/run_${run_name}"
-user_dir="./unimol_plus"
+# fold_path, data_path, and save_dir are set after CLI parsing
+user_dir="/home/jovyan/potapov/nablaColors/nablaColors/unimol_plus/"
 train_set="train"
 valid_sets="valid"
-chemprop_pretrain="../models/chemprop/fold_0/model_1/model.pt"
+# chemprop_pretrain set after CLI parsing
 
 # Defaults (can be overridden by CLI)
-pretrained_model="../unimol_plus_pcq_small.pt"
+pretrained_model="/home/jovyan/potapov/nablaColors/unimol_plus_pcq_small.pt"
 
 batch_size=16
-batch_size_valid=16
+batch_size_valid=4
 lr=5e-4
 end_lr=1e-9
 
@@ -53,17 +53,31 @@ arch="uniprop_small"
 export NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=1
 
-# Parse CLI flags
+# Parse CLI flags (required: --fold-name and --fold-path)
 while [ $# -gt 0 ]; do
     case "$1" in
-        --data-path)
-            data_path="$2"; shift 2 ;;
+        --fold-name|--fold_name)
+            fold_name="$2"; shift 2 ;;
+        --fold-path|--fold_path)
+            fold_path="$2"; shift 2 ;;
         --pretrained-model)
             pretrained_model="$2"; shift 2 ;;
         *)
             echo "Unknown argument: $1"; exit 1 ;;
     esac
 done
+
+# Require mandatory flags
+if [ -z "${fold_name:-}" ] || [ -z "${fold_path:-}" ]; then
+    echo "Usage: $0 --fold-name <N> --fold-path <PATH> [--pretrained-model <FILE>]" >&2
+    exit 1
+fi
+
+# Derive paths and names from required flags
+data_path="${fold_path}/split_${fold_name}/"
+run_name=bs_64_head_pretrain_fold_${fold_name}
+save_dir="/home/jovyan/potapov/nablaColors/results/checkpoints_unimol/exp_${exp_name}/run_${run_name}/"
+chemprop_pretrain="/home/jovyan/potapov/nablaColors/nablaColors/models/chemprop/fold_0/model_1/model.pt"
 
 more_args="--finetune-from-model $pretrained_model
 --checkpoint-suffix _exp${exp_name}_run${run_name} --wandb-project UniMol 
@@ -79,7 +93,7 @@ export NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=1
 
 echo "torchrun --nproc_per_node=$n_gpu --nnodes=$OMPI_COMM_WORLD_SIZE  --node_rank=$OMPI_COMM_WORLD_RANK  --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
-      $(which unicore-train) $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
+      /home/user/.local/bin/unicore-train $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
       --num-workers 4 --ddp-backend=c10d \
       --task pcq --loss unimol_plus --arch $arch --chemprop-weight-path $chemprop_pretrain  \
       --fp16-init-scale 4 --fp16-scale-window 256 --tensorboard-logdir $save_dir/tsb \
@@ -98,7 +112,7 @@ echo "torchrun --nproc_per_node=$n_gpu --nnodes=$OMPI_COMM_WORLD_SIZE  --node_ra
       --mid-prob $mid_prob --mid-lower $mid_lower --mid-upper $mid_upper --seed $seed $more_args"
 
 torchrun --nproc_per_node=$n_gpu --nnodes=$OMPI_COMM_WORLD_SIZE  --node_rank=$OMPI_COMM_WORLD_RANK  --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
-      $(which unicore-train) $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
+      /home/user/.local/bin/unicore-train  $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
       --num-workers 4 --ddp-backend=c10d \
       --task pcq --loss unimol_plus --arch $arch  --chemprop-weight-path $chemprop_pretrain \
       --fp16-init-scale 4 --fp16-scale-window 256 --tensorboard-logdir $save_dir/tsb \

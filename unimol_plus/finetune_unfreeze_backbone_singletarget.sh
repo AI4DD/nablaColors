@@ -2,30 +2,47 @@
 
 MASTER_PORT=10015
 MASTER_IP=127.0.0.1
-n_gpu=2
+n_gpu=1
 
 exp_name=singletarget
-run_name=bs_64_unfreeze_backbone_5e-4lr
+run_name=bs_64_unfreeze_backbone
 
 OMPI_COMM_WORLD_SIZE=1
 OMPI_COMM_WORLD_RANK=0
-data_path="../conformations/xtb_to_dft_implicit/"
-save_dir="../results/checkpoints_unimol/exp_${exp_name}/run_${run_name}"
-user_dir="./unimol_plus"
+data_path="/home/jovyan/potapov/nablaColors/conformations/xtb_to_dft_implicit/"
+
+user_dir="/home/jovyan/potapov/nablaColors/nablaColors/unimol_plus/"
 train_set="train"
 valid_sets="valid,test"
-chemprop_pretrain="../models/chemprop/fold_0/model_1/model.pt"
+chemprop_pretrain="/home/jovyan/potapov/nablaColors/nablaColors/models/chemprop/fold_0/model_1/model.pt"
 
 # Defaults (can be overridden by CLI)
-pretrained_model="../results/checkpoints_unimol/exp_singletarget/run_bs_2_head_pretrain-ema0.999/checkpoint_best_expsingletarget_runbs_64_head_pretrain.pt"
+pretrained_model="/home/jovyan/potapov/nablaColors/results/checkpoints_unimol/checkpoint_best_expsingletarget_runbs_64_head_pretrain.pt"
 
 batch_size=4
 batch_size_valid=4
+# Parse CLI flags (required: --lr)
+# Parse CLI flags (required: --lr)
 lr=5e-4
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --lr)
+            lr="$2"; shift 2 ;;
+        --data-path)
+            data_path="$2"; shift 2 ;;
+        --pretrained-model)
+            pretrained_model="$2"; shift 2 ;;
+        *)
+            echo "Unknown argument: $1"; exit 1 ;;
+    esac
+done
+
 end_lr=1e-9
+run_name=${run_name}_lr${lr}
+save_dir="/home/jovyan/potapov/nablaColors/results/checkpoints_unimol/exp_${exp_name}/run_${run_name}/"
 
 warmup_steps=10000
-total_steps=80000
+total_steps=100000
 update_freq=16
 seed=1
 clip_norm=5
@@ -83,7 +100,7 @@ export NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=1
 
 echo "torchrun --nproc_per_node=1 --nnodes=1  --node_rank=$OMPI_COMM_WORLD_RANK  --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
-      $(which unicore-train) $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
+      /home/user/.local/bin/unicore-train $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
       --num-workers 8 --ddp-backend=c10d \
       --task pcq --loss unimol_plus --arch $arch --chemprop-weight-path $chemprop_pretrain  \
       --fp16 False --fp16-init-scale 4 --fp16-scale-window 256 --tensorboard-logdir $save_dir/tsb \
@@ -102,7 +119,7 @@ echo "torchrun --nproc_per_node=1 --nnodes=1  --node_rank=$OMPI_COMM_WORLD_RANK 
       --mid-prob $mid_prob --mid-lower $mid_lower --mid-upper $mid_upper --seed $seed $more_args " 
 
 torchrun --nproc_per_node=$n_gpu --nnodes=$OMPI_COMM_WORLD_SIZE  --node_rank=$OMPI_COMM_WORLD_RANK  --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
-      $(which unicore-train) $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
+      /home/user/.local/bin/unicore-train $data_path --user-dir $user_dir --train-subset $train_set --valid-subset $valid_sets \
       --num-workers 4 --ddp-backend=c10d \
       --task pcq --loss unimol_plus --arch $arch  --chemprop-weight-path $chemprop_pretrain \
       --fp16-init-scale 4 --fp16-scale-window 256 --tensorboard-logdir $save_dir/tsb \

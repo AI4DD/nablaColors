@@ -82,7 +82,7 @@ class UnimolPlusLoss(UnicoreLoss):
                 targets_mod[:, 2] = plqy_target
                 return targets_mod
 
-            targets = get_plqy_logit_transform(targets)
+            # targets = get_plqy_logit_transform(targets)
             NaN_target_mask = torch.isnan(targets)
             targets[NaN_target_mask] = 0.0
             per_data_loss = None
@@ -91,7 +91,7 @@ class UnimolPlusLoss(UnicoreLoss):
 
                 # Calculate L1 loss for each target separately
                 per_data_loss = torch.nn.L1Loss(reduction="none")(
-                    graph_output.float(), targets
+                    graph_output.float(), get_plqy_logit_transform(targets)
                 ) * (1 - NaN_target_mask.float())  # mask out NaN targets
 
                 # Apply different weights to each target column

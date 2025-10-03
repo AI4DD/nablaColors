@@ -193,6 +193,8 @@ class UnimolPlusLoss(UnicoreLoss):
             logging_output["id"] = sample["batched_data"]["id"].cpu().numpy()
             logging_output["pred"] = per_data_pred.detach().cpu().numpy()
             logging_output["label"] = per_data_label.detach().cpu().numpy()
+            if self.args.multitarget:
+                logging_output['target_mask'] = NaN_target_mask.detach().cpu().numpy()
         # Removed redundant tensor assignment to prevent accumulating GPU tensors in logging dict
         logging_output["total_loss"] = total_loss.item()
         return total_loss, sample_size, logging_output
@@ -206,6 +208,7 @@ class UnimolPlusLoss(UnicoreLoss):
             label = np.concatenate([log["label"] for log in logging_outputs])
             is_multitarget = pred.ndim > 1
             if is_multitarget:
+                target_mask = np.concatenate([log["target_mask"] for log in logging_outputs])
                 def sigmoid(x):
                     return 1 / (1 + np.exp(-x))
 
@@ -215,6 +218,9 @@ class UnimolPlusLoss(UnicoreLoss):
                 label_abs = label[:, 0]
                 label_ems = label[:, 1]
                 label_plqy = label[:, 2]
+                target_mask_abs = target_mask[:,0]
+                target_mask_ems = target_mask[:,1]
+                target_mask_plqy = target_mask[:,2]
                 res_dict = {
                     "id": id,
                     "pred_abs": pred_abs,
@@ -223,6 +229,9 @@ class UnimolPlusLoss(UnicoreLoss):
                     "label_abs": label_abs,
                     "label_ems": label_ems,
                     "label_plqy": label_plqy,
+                    "target_mask_abs": target_mask_abs,
+                    "target_mask_ems": target_mask_ems,
+                    "target_mask_plqy": target_mask_plqy,
                 }
             else:
                 res_dict = {
@@ -236,9 +245,9 @@ class UnimolPlusLoss(UnicoreLoss):
             df_median = df_grouped.agg("median")
             if is_multitarget:
                 def get_mae_losses(df):
-                    abs_non_nan_mask = ~df["label_abs"].isna()
-                    ems_non_nan_mask = ~df["label_ems"].isna()
-                    plqy_non_nan_mask = ~df["label_plqy"].isna()
+                    abs_non_nan_mask = ~df["target_mask_abs"]
+                    ems_non_nan_mask = ~df["target_mask_ems"]
+                    plqy_non_nan_mask = ~df["target_mask_plqy"]
                     abs_loss = np.abs(
                         df["pred_abs"][abs_non_nan_mask] - df["label_abs"][abs_non_nan_mask]
                     ).mean()
@@ -260,9 +269,9 @@ class UnimolPlusLoss(UnicoreLoss):
                     return log_plqy_loss
 
                 # Compute per-target metrics only if that target has any non-NaN labels
-                abs_has = (~df_mean["label_abs"].isna()).sum() > 0
-                ems_has = (~df_mean["label_ems"].isna()).sum() > 0
-                plq_has = (~df_mean["label_plqy"].isna()).sum() > 0
+                abs_has = (~df["target_mask_abs"]).sum() > 0
+                ems_has = (~df["target_mask_ems"]).sum() > 0
+                plq_has = (~df["target_mask_plqy"]).sum() > 0
 
                 abs_loss_by_mean, ems_loss_by_mean, plqy_loss_by_mean = get_mae_losses(df_mean)
                 abs_loss_by_median, ems_loss_by_median, plqy_loss_by_median = get_mae_losses(df_median)

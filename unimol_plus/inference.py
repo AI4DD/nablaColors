@@ -55,7 +55,19 @@ def main(args):
     state = checkpoint_utils.load_checkpoint_to_cpu(args.path)
     task = tasks.setup_task(args)
     model = task.build_model(args)
-    model.load_state_dict(state["ema"]["params"], strict=True)
+    # print(state["model"].keys())
+    print(model)
+    # Prefer EMA weights when available, to match `validate.py` behavior.
+    use_ema = (not getattr(args, "no_ema", False)) and isinstance(state, dict) and ("ema" in state)
+    if use_ema and isinstance(state.get("ema", None), dict) and ("params" in state["ema"]):
+        logger.info("Loading EMA weights from checkpoint (state['ema']['params'])")
+        model.load_state_dict(state["ema"]["params"], strict=True)
+    else:
+        if getattr(args, "no_ema", False):
+            logger.info("Loading non-EMA weights (disabled via --no-ema)")
+        else:
+            logger.info("Loading non-EMA weights (EMA not found in checkpoint)")
+        model.load_state_dict(state["model"], strict=True)
 
     if use_cuda:
         model.cuda()
@@ -130,6 +142,26 @@ def main(args):
                 "wb",
             ),
         )
+        try:
+            import pandas as pd
+            ids_list = [x[0] for x in outputs]
+            preds_list = [x[2] for x in outputs]
+            targets_list = [x[3] for x in outputs]
+            
+            if len(ids_list) > 0:
+                df = pd.DataFrame({
+                    "id": np.concatenate(ids_list),
+                    "target": np.concatenate(targets_list),
+                    "prediction": np.concatenate(preds_list),
+                })
+                df.to_csv(
+                    os.path.join(
+                        args.results_path, subset + "_{}.csv".format(data_parallel_rank)
+                    ),
+                    index=False
+                )
+        except Exception as e:
+            logger.warning(f"Failed to save CSV: {e}")
         print("Finished {} subset, rank {}".format(subset, data_parallel_rank))
         if data_parallel_world_size > 1:
             tmp = distributed_utils.all_gather_list(
@@ -138,12 +170,36 @@ def main(args):
                 group=distributed_utils.get_data_parallel_group(),
             )
 
+        if data_parallel_rank == 0:
+            try:
+                import pandas as pd
+                csv_files = [
+                    os.path.join(args.results_path, "{}_{}.csv".format(subset, r))
+                    for r in range(data_parallel_world_size)
+                ]
+                dfs = []
+                for f in csv_files:
+                    if os.path.exists(f):
+                        dfs.append(pd.read_csv(f))
+                
+                if dfs:
+                    merged_df = pd.concat(dfs)
+                    merged_df.to_csv(os.path.join(args.results_path, "{}.csv".format(subset)), index=False)
+                    logger.info("Merged CSV saved to {}".format(os.path.join(args.results_path, "{}.csv".format(subset))))
+            except Exception as e:
+                logger.warning(f"Failed to merge CSVs: {e}")
+
     return None
 
 
 def cli_main():
     parser = options.get_validation_parser()
     options.add_model_args(parser)
+    parser.add_argument(
+        "--no-ema",
+        action="store_true",
+        help="Use non-EMA weights from checkpoint (state['model']) even if EMA weights exist.",
+    )
     args = options.parse_args_and_arch(parser)
     distributed_utils.call_main(args, main)
 

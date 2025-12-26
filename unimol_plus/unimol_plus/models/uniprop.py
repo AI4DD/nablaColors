@@ -22,6 +22,7 @@ from .layers import (
 from .chemprop import MPN, MoleculeDatapoint, MoleculeDataset
 
 from .unimol_plus_encoder import UnimolPLusEncoder
+from .lora_utils import inject_lora_adapters
 
 
 logger = logging.getLogger(__name__)
@@ -220,6 +221,31 @@ class UniPropModel(BaseUnicoreModel):
             help="loss weight for PLQY target",
         )
 
+        # LoRA fine-tuning options
+        parser.add_argument(
+            "--finetune-lora",
+            action="store_true",
+            help="Enable LoRA adapters for fine-tuning",
+        )
+        parser.add_argument(
+            "--lora-r",
+            type=int,
+            default=8,
+            help="LoRA rank",
+        )
+        parser.add_argument(
+            "--lora-alpha",
+            type=float,
+            default=16.0,
+            help="LoRA alpha scaling",
+        )
+        parser.add_argument(
+            "--lora-dropout",
+            type=float,
+            default=0.0,
+            help="LoRA dropout",
+        )
+
         # parser.add_argument(    # FIXME add chemprop args to class
         #     "--min-dist-loss-weight",
         #     type=float,
@@ -306,6 +332,19 @@ class UniPropModel(BaseUnicoreModel):
         self.movement_pred_head.zero_init()
         self._num_updates = 0
         self.dtype = torch.float32
+
+        # Inject LoRA adapters if requested
+        if getattr(self.args, "finetune_lora", False):
+            # Wrap all Linear layers in the model except energy_head and chemprop backbone
+            inject_lora_adapters(
+                self,
+                r=self.args.lora_r,
+                lora_alpha=self.args.lora_alpha,
+                lora_dropout=self.args.lora_dropout,
+                include_all_linear=True,
+                exclude_modules=[self.energy_head, self.chemprop_encoder],
+                exclude_name_substrings=["energy_head"],
+            )
 
     def half(self):
         super().half()

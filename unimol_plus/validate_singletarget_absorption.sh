@@ -10,9 +10,9 @@ nnodes=1
 node_rank=0
 
 exp_name=singletarget
-run_name=bs_2_unfreeze_backbone
+run_name=final_xtb_to_dft_implicit
 
-data_path="../xtb_to_dft_implicit/split_1"
+data_path="/home/potapov/nablaColors/unimol_plus/absorption/xtb_to_dft_implicit"
 user_dir="./unimol_plus"
 arch="uniprop_small"
 subset="valid"
@@ -21,8 +21,8 @@ save_dir_set=0
 results_path_set=0
 weight_path_set=0
 
-batch_size=16
-num_workers=8
+batch_size=32
+num_workers=1
 
 usage() {
   echo "Usage: $0 [--data-path PATH] [--weight-path FILE] [--subset NAME] [--results-path DIR] \
@@ -56,7 +56,7 @@ done
 
 # Derive save_dir if not provided explicitly
 if [ $save_dir_set -eq 0 ]; then
-  save_dir="../results/checkpoints_unimol/exp_${exp_name}/run_${run_name}-ema0.999"
+  save_dir="/home/potapov/nablaColors/results/checkpoints_unimol/exp_${exp_name}/run_${run_name}-ema0.999"
 fi
 
 # Derive results_path if not provided explicitly
@@ -67,13 +67,14 @@ mkdir -p "$results_path"
 
 # Derive weight_path if not provided explicitly
 if [ $weight_path_set -eq 0 ]; then
-  weight_path="${save_dir}/checkpoint_best_exp${exp_name}_run${run_name}.pt"
+  weight_path="/home/potapov/nablaColors/results/checkpoints_unimol/exp_singletarget/checkpoint_best_expsingletarget_runbs_64_unfreeze_backbone_lr6e-05.pt"
 fi
 
 export NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=1
 
-echo "torchrun --nproc_per_node=$n_gpu --nnodes=$nnodes --node_rank=$node_rank --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
+
+command="torchrun --nproc_per_node=$n_gpu --nnodes=$nnodes  --node_rank=$node_rank  --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
       ./validate.py --user-dir $user_dir $data_path --valid-subset $subset \
       --results-path $results_path \
       --num-workers $num_workers --ddp-backend=c10d --batch-size $batch_size \
@@ -82,14 +83,5 @@ echo "torchrun --nproc_per_node=$n_gpu --nnodes=$nnodes --node_rank=$node_rank -
       --fp16-init-scale 4 --fp16-scale-window 256 \
       --log-interval 50 --log-format simple --label-prob 0.0 --required-batch-size-multiple 1"
 
-torchrun --nproc_per_node=$n_gpu --nnodes=$nnodes  --node_rank=$node_rank  --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
-      ./validate.py --user-dir $user_dir $data_path --valid-subset $subset \
-      --results-path $results_path \
-      --num-workers $num_workers --ddp-backend=c10d --batch-size $batch_size \
-      --task pcq --loss unimol_plus --arch $arch \
-      --path $weight_path \
-      --fp16-init-scale 4 --fp16-scale-window 256 \
-      --log-interval 50 --log-format simple --label-prob 0.0 --required-batch-size-multiple 1
-
-
-
+echo $command
+$command

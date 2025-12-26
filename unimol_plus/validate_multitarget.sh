@@ -73,16 +73,7 @@ fi
 export NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=1
 
-echo "torchrun --nproc_per_node=$n_gpu --nnodes=$nnodes --node_rank=$node_rank --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
-      ./validate.py --user-dir $user_dir $data_path --valid-subset $subset \
-      --results-path $results_path \
-      --num-workers $num_workers --ddp-backend=c10d --batch-size $batch_size \
-      --task pcq --loss unimol_plus --arch $arch \
-      --path $weight_path \
-      --fp16-init-scale 4 --fp16-scale-window 256 \
-      --log-interval 50 --log-format simple --label-prob 0.0 --required-batch-size-multiple 1"
-
-torchrun --nproc_per_node=$n_gpu --nnodes=$nnodes  --node_rank=$node_rank  --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
+command="torchrun --nproc_per_node=$n_gpu --nnodes=$nnodes  --node_rank=$node_rank  --master_addr=$MASTER_IP --master_port=$MASTER_PORT \
       ./validate.py --user-dir $user_dir $data_path --valid-subset $subset \
       --results-path $results_path \
       --num-workers $num_workers --ddp-backend=c10d --batch-size $batch_size \
@@ -91,3 +82,5 @@ torchrun --nproc_per_node=$n_gpu --nnodes=$nnodes  --node_rank=$node_rank  --mas
       --fp16-init-scale 4 --fp16-scale-window 256 \
       --log-interval 50 --log-format simple --label-prob 0.0 --required-batch-size-multiple 1
 
+echo $command
+$command

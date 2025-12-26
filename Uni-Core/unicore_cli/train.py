@@ -79,6 +79,18 @@ def main(args) -> None:
 
         for param in model.energy_head.parameters():
             param.requires_grad = True
+    # LoRA fine-tune mode: freeze base, unfreeze only LoRA adapters (and head)
+    if args.finetune_lora:
+        from unimol_plus.models.lora_utils import mark_only_lora_trainable
+        for param in model.parameters():  
+            param.requires_grad = True        
+        mark_only_lora_trainable(model, train_bias=False)
+        # ensure prediction head is trainable
+        # for p in model.energy_head.parameters():
+        #     p.requires_grad = True
+
+    # LoRA fine-tune mode: train full model (LoRA + non-LoRA) except when head_pretrain is active
+    # We do not freeze to LoRA-only here to allow embeddings and chemprop to update as requested.
 
     loss = task.build_loss(args)
 

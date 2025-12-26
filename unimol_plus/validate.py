@@ -26,7 +26,7 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-x))
 
 
-def compute_metrics(pred: np.ndarray, label: np.ndarray, ids: np.ndarray) -> Dict[str, float]:
+def compute_metrics_multitarget(pred: np.ndarray, label: np.ndarray, ids: np.ndarray) -> Dict[str, float]:
     pred_abs = pred[:, 0]
     pred_ems = pred[:, 1]
     pred_plqy = _sigmoid(pred[:, 2])
@@ -79,6 +79,53 @@ def compute_metrics(pred: np.ndarray, label: np.ndarray, ids: np.ndarray) -> Dic
         "plqy_log_MAE_by_mean": float(plqy_log_mean),
         "plqy_log_MAE_by_median": float(plqy_log_med),
     }
+
+
+def compute_metrics_singletarget(pred: np.ndarray, label: np.ndarray, ids: np.ndarray) -> Dict[str, float]:
+    """Compute metrics for single-target absorption prediction."""
+    import pandas as pd
+
+    # Handle both single-value labels and 3-value labels (where only first is valid)
+    if label.ndim > 1 and label.shape[1] > 1:
+        # If labels are 3D, extract only absorption (first column)
+        label_abs = label[:, 0]
+    else:
+        # If labels are 1D, use directly
+        label_abs = label.flatten() if label.ndim > 1 else label
+    
+    pred_abs = pred.flatten() if pred.ndim > 1 else pred
+
+    df = pd.DataFrame(
+        {
+            "id": ids,
+            "pred_abs": pred_abs,
+            "label_abs": label_abs,
+        }
+    )
+    df_grouped = df.groupby(["id"])
+    df_mean = df_grouped.agg("mean")
+    df_median = df_grouped.agg("median")
+
+    def get_mae_absorption(df_):
+        abs_non_nan = ~df_["label_abs"].isna()
+        abs_loss = np.abs(df_["pred_abs"][abs_non_nan] - df_["label_abs"][abs_non_nan]).mean()
+        return abs_loss
+
+    abs_mean = get_mae_absorption(df_mean)
+    abs_med = get_mae_absorption(df_median)
+
+    return {
+        "abs_MAE_by_mean": float(abs_mean),
+        "abs_MAE_by_median": float(abs_med),
+    }
+
+
+def compute_metrics(pred: np.ndarray, label: np.ndarray, ids: np.ndarray, multitarget: bool = True) -> Dict[str, float]:
+    """Compute metrics for either multitarget or single-target prediction."""
+    if multitarget:
+        return compute_metrics_multitarget(pred, label, ids)
+    else:
+        return compute_metrics_singletarget(pred, label, ids)
 
 
 def _barrier_small():
@@ -142,6 +189,10 @@ def run_validate(args) -> Dict[str, Any]:
         default_log_format=("tqdm" if not args.no_progress_bar else "simple"),
     )
 
+    # Check if multitarget mode is enabled (defaults to False for single-target)
+    multitarget = getattr(args, "multitarget", False)
+    logger.info(f"Validation mode: {'multitarget' if multitarget else 'single-target absorption'}")
+    
     with torch.no_grad():
         for i, sample in enumerate(progress):
             if use_cuda:
@@ -151,8 +202,21 @@ def run_validate(args) -> Dict[str, Any]:
                 continue
             graph_output, _pos_pred = model(**sample)[:2]
             ids = sample["batched_data"]["id"].cpu().numpy()
-            preds = graph_output.float().view(-1, 3).cpu().numpy()
-            labels = sample["batched_data"]["target"].float().view(-1, 3).cpu().numpy()
+            
+            if multitarget:
+                preds = graph_output.float().view(-1, 3).cpu().numpy()
+                labels = sample["batched_data"]["target"].float().view(-1, 3).cpu().numpy()
+            else:
+                # Single-target: predictions are 1D, labels might be 1D or 3D (use first column)
+                preds = graph_output.float().view(-1).cpu().numpy()
+                target_raw = sample["batched_data"]["target"].float()
+                if target_raw.ndim > 1 and target_raw.shape[1] > 1:
+                    # Labels are 3D, extract only absorption (first column)
+                    labels = target_raw.view(-1, 3)[:, 0].cpu().numpy()
+                else:
+                    # Labels are 1D
+                    labels = target_raw.view(-1).cpu().numpy()
+            
             all_ids.append(ids)
             all_preds.append(preds)
             all_labels.append(labels)
@@ -160,8 +224,12 @@ def run_validate(args) -> Dict[str, Any]:
 
     # Stack local
     ids_np = np.concatenate(all_ids) if len(all_ids) else np.empty((0,), dtype=np.int64)
-    preds_np = np.concatenate(all_preds) if len(all_preds) else np.empty((0, 3), dtype=np.float32)
-    labels_np = np.concatenate(all_labels) if len(all_labels) else np.empty((0, 3), dtype=np.float32)
+    if multitarget:
+        preds_np = np.concatenate(all_preds) if len(all_preds) else np.empty((0, 3), dtype=np.float32)
+        labels_np = np.concatenate(all_labels) if len(all_labels) else np.empty((0, 3), dtype=np.float32)
+    else:
+        preds_np = np.concatenate(all_preds) if len(all_preds) else np.empty((0,), dtype=np.float32)
+        labels_np = np.concatenate(all_labels) if len(all_labels) else np.empty((0,), dtype=np.float32)
 
     # Save per-rank temporary outputs
     os.makedirs(args.results_path, exist_ok=True)
@@ -197,11 +265,15 @@ def run_validate(args) -> Dict[str, Any]:
             preds_all = np.concatenate(merged_preds)
             labels_all = np.concatenate(merged_labels)
         else:
+            if multitarget:
+                preds_all = np.empty((0, 3), dtype=np.float32)
+                labels_all = np.empty((0, 3), dtype=np.float32)
+            else:
+                preds_all = np.empty((0,), dtype=np.float32)
+                labels_all = np.empty((0,), dtype=np.float32)
             ids_all = np.empty((0,), dtype=np.int64)
-            preds_all = np.empty((0, 3), dtype=np.float32)
-            labels_all = np.empty((0, 3), dtype=np.float32)
 
-        metrics_dict = compute_metrics(preds_all, labels_all, ids_all)
+        metrics_dict = compute_metrics(preds_all, labels_all, ids_all, multitarget=multitarget)
         out_base = os.path.join(args.results_path, f"{subset}")
         with open(out_base + ".metrics.json", "w") as f:
             json.dump(metrics_dict, f, indent=2)
@@ -210,19 +282,25 @@ def run_validate(args) -> Dict[str, Any]:
         logger.info("Validation metrics: " + json.dumps(metrics_dict))
 
         # Pretty table to stdout
-        order = [
-            "abs_MAE_by_mean",
-            "ems_MAE_by_mean",
-            "plqy_MAE_by_mean",
-            "abs_MAE_by_median",
-            "ems_MAE_by_median",
-            "plqy_MAE_by_median",
-            "plqy_log_MAE_by_mean",
-            "plqy_log_MAE_by_median",
-        ]
+        if multitarget:
+            order = [
+                "abs_MAE_by_mean",
+                "ems_MAE_by_mean",
+                "plqy_MAE_by_mean",
+                "abs_MAE_by_median",
+                "ems_MAE_by_median",
+                "plqy_MAE_by_median",
+                "plqy_log_MAE_by_mean",
+                "plqy_log_MAE_by_median",
+            ]
+        else:
+            order = [
+                "abs_MAE_by_mean",
+                "abs_MAE_by_median",
+            ]
         w = max(len("Metric"), max(len(k) for k in order if k in metrics_dict))
         print()
-        print(f"Validation metrics (subset: {subset})")
+        print(f"Validation metrics (subset: {subset}, mode: {'multitarget' if multitarget else 'single-target absorption'})")
         print(f"{'Metric'.ljust(w)}  Value")
         print(f"{'-'*w}  {'-'*12}")
         for k in order:

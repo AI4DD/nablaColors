@@ -13,6 +13,16 @@ Usage:
     --input rdkit.xyz \
     --workdir xtb_opt \
     --xtb-binary xtb \
+    --charge 0 \
+    --uhf 0 \
+    --flags --gfn 2 --opt
+
+Example: +1 charge with 2 unpaired electrons:
+  python examples/conformation_generation/02_optimize_xtb_from_xyz.py \
+    --input rdkit.xyz \
+    --workdir xtb_opt_c1_uhf2 \
+    --charge 1 \
+    --uhf 2 \
     --flags --gfn 2 --opt
 """
 
@@ -30,6 +40,13 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     ap.add_argument("--input", required=True, help="Input XYZ file.")
     ap.add_argument("--workdir", default="xtb_opt", help="Work directory (default: xtb_opt)")
     ap.add_argument("--xtb-binary", default="xtb", help="Path to xtb binary (default: xtb)")
+    ap.add_argument("--charge", type=int, default=0, help="Molecular charge, passed as xtb --chrg (default: 0)")
+    ap.add_argument(
+        "--uhf",
+        type=int,
+        default=0,
+        help="Number of unpaired electrons, passed as xtb --uhf (default: 0)",
+    )
     ap.add_argument(
         "--flags",
         nargs=argparse.REMAINDER,
@@ -54,7 +71,15 @@ def main() -> None:
     shutil.copy2(input_xyz, local_input_xyz)
 
     xtb_log = os.path.join(workdir, "xtb.log")
-    cmd = [args.xtb_binary, input_name, *args.flags]
+    cmd = [
+        args.xtb_binary,
+        input_name,
+        "--chrg",
+        str(args.charge),
+        "--uhf",
+        str(args.uhf),
+        *args.flags,
+    ]
 
     print(f"Running in {workdir}: {' '.join(cmd)}")
     with open(xtb_log, "w", encoding="utf-8") as log_f:

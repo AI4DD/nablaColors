@@ -5,6 +5,7 @@ This folder contains minimal, runnable examples for generating and optimizing co
 - `01_smiles_to_rdkit_xyz.py`: SMILES → RDKit 3D conformation → `rdkit.xyz`
 - `02_optimize_xtb_from_xyz.py`: `input.xyz` → xTB optimization (writes `xtb.log`, typically `xtbopt.xyz`)
 - `03_optimize_orca_from_xyz.py`: `input.xyz` → ORCA optimization (writes `orca_opt.inp`, `orca.log`)
+- `04_csv_to_lmdb_rdkit.py`: CSV (chromophore SMILES + solvent SMILES) → RDKit conformer → LMDB (UniProp `pcq` format)
 
 ### Quickstart
 
@@ -48,6 +49,17 @@ python examples/conformation_generation/03_optimize_orca_from_xyz.py \
   --charge 0 \
   --mult 1 \
   --solvent water
+```
+
+Build LMDB from CSV (for UniProp inference):
+
+```bash
+python examples/conformation_generation/04_csv_to_lmdb_rdkit.py \
+  --csv screening.csv \
+  --out-dir screening_lmdb \
+  --split test \
+  --smiles-col smiles \
+  --solvent-col solvent_smi
 ```
 
 

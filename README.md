@@ -25,7 +25,7 @@ Notes:
 
 ## Dataset and LMDB reading
 
-- **Download**: the dataset archive is available on Zenodo: [Zenodo record](https://zenodo.org/records/16886724).
+- **Download**: the dataset and pretrained UniProp checkpoints are available on Zenodo: [Zenodo record](https://zenodo.org/records/18061300)
 
 ### Dataset contents
 
@@ -86,6 +86,11 @@ if __name__ == "__main__":
 
 - Uni-Mol+ small checkpoint is taken from the official repository (see `unimol_plus`): https://github.com/deepmodeling/Uni-Mol/tree/main/unimol_plus
 - Chemprop model for solvent embedding is expected at: `models/chemprop/fold_0/model_1/model.pt`
+- Pretrained UniProp checkpoints are available in the newer Zenodo release: [Zenodo record](https://zenodo.org/records/18061300)
+  - `uniprop_rdkit_to_dft_implicit.pt` (md5: `c87305171142e1c0898a0e2b67a7236a`)
+  - `uniprop_rdkit_to_xtb.pt` (md5: `7be9b8858e70a85718429cd17dd0670b`)
+  - `uniprop_xtb_to_dft_implicit.pt` (md5: `b9768e7b4f69b4d54b5d436b7403e883`)
+  - `uniprop_xtb_to_dft_vacuum.pt`
 
 
 ## Reproducing experiments (training scripts)
@@ -167,6 +172,26 @@ Minimal, runnable example scripts are provided under `examples/conformation_gene
 - **RDKit conformer**: SMILES → RDKit 3D conformation → XYZ
 - **xTB optimization**: XYZ → xTB optimize (`--gfn 2 --opt`)
 - **ORCA optimization**: XYZ → ORCA optimize (vacuum by default; optional CPCM solvent)
+
+### SMILES/solvent CSV → LMDB (for UniProp inference / screening)
+
+If you have a CSV with at least **chromophore SMILES** and **solvent SMILES**, you can build a UniProp-compatible LMDB (gzip-compressed pickled dicts) using:
+
+```bash
+python examples/conformation_generation/04_csv_to_lmdb_rdkit.py \
+  --csv screening.csv \
+  --out-dir screening_lmdb \
+  --split test \
+  --smiles-col smiles \
+  --solvent-col solvent_smi
+```
+
+Minimum CSV header example:
+
+```text
+smiles,solvent_smi
+CCO,O
+```
 
 See: `examples/conformation_generation/README.md`
 

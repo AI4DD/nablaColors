@@ -160,3 +160,13 @@ Outputs (per subset):
 - `${results_path}/${subset}.metrics.json` — aggregated metrics
 - `${results_path}/${subset}.preds.pkl` — merged predictions and labels
 
+## Conformation generation examples
+
+Minimal, runnable example scripts are provided under `examples/conformation_generation/`:
+
+- **RDKit conformer**: SMILES → RDKit 3D conformation → XYZ
+- **xTB optimization**: XYZ → xTB optimize (`--gfn 2 --opt`)
+- **ORCA optimization**: XYZ → ORCA optimize (vacuum by default; optional CPCM solvent)
+
+See: `examples/conformation_generation/README.md`
+

@@ -23,6 +23,18 @@ Notes:
 - The script `install_unicore.sh` should install Uni-Core and its dependencies (PyTorch, CUDA toolkit compatibility, and Unicore Python packages). If you prefer manual install, install the local `Uni-Core` first (e.g., `pip install -e Uni-Core/`) and ensure `unicore-train` is available in your environment.
 - Recommended Python: 3.10.
 
+## Chemprop version and implementation
+
+This repository includes a vendored copy of **Chemprop v1.3.0**, corresponding to the official GitHub release:
+https://github.com/chemprop/chemprop/tree/v1.3.0
+
+This is the same Chemprop version used in the study  
+*“Multi-fidelity prediction of molecular optical peaks with deep learning”*
+(DOI: 10.1039/D1SC05677H), and is used here to ensure consistent molecular featurization and model behavior.
+
+⚠️ **Important**: Users do **not** need to install Chemprop separately.  
+Models trained with Chemprop v1.x are **not compatible** with Chemprop v2.x without running the official conversion script, and using Chemprop v2.x may lead to inconsistent results.
+
 ## Dataset and LMDB reading
 
 - **Download**: the dataset and pretrained UniProp checkpoints are available on Zenodo: [Zenodo record](https://zenodo.org/records/18061300)

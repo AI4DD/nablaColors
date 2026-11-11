@@ -18,7 +18,7 @@ pip install \
     numpy==2.2.6 \
     numba==0.61.2 \
     scipy==1.16.1 \
-    scikit-learn==1.7.1
+    scikit-learn==1.7.1 \
     pandas==2.3.1 \
     lmdb==1.7.3 \
     tqdm==4.67.1 \
@@ -26,7 +26,7 @@ pip install \
     wandb==0.21.0 \
     tensorboardX==2.6.4 \
     ml_collections==1.1.0 \
-    rdkit==2025.3.5 \
+    rdkit==2025.3.5
 
 echo "Verifying PyTorch CUDA installation"
 python -c "import torch; print(f'PyTorch {torch.__version__} - CUDA: {torch.cuda.is_available()} - GPUs: {torch.cuda.device_count()}')"
